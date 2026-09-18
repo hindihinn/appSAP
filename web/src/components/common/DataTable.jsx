@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import StatusBadge from './StatusBadge';
+import { FaSearch, FaInbox } from 'react-icons/fa';
 
 export default function DataTable({ columns, data, loading, onAdd, addLabel, actions, searchable = true }) {
   const [search, setSearch] = useState('');
@@ -20,7 +21,7 @@ export default function DataTable({ columns, data, loading, onAdd, addLabel, act
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flex: 1 }}>
           {searchable && (
             <div className="header-search" style={{ maxWidth: 280 }}>
-              <span className="search-icon">🔍</span>
+              <span className="search-icon"><FaSearch size={13} /></span>
               <input placeholder="Cari..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
             </div>
           )}
@@ -36,7 +37,7 @@ export default function DataTable({ columns, data, loading, onAdd, addLabel, act
         <div className="loading"><div className="spinner" /></div>
       ) : paginated.length === 0 ? (
         <div className="empty-state">
-          <div className="empty-icon">📭</div>
+          <div className="empty-icon"><FaInbox size={40} style={{ color: 'var(--text-muted)' }} /></div>
           <h3>Tidak ada data</h3>
           <p>Belum ada data yang tersedia</p>
         </div>

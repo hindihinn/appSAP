@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import '../config/api_config.dart';
+import 'image_loader.dart';
 
 class PhotoViewer extends StatelessWidget {
   final List<Map<String, String>> photos; // e.g. [{'url': '/uploads/...', 'desc': 'Depan'}]
@@ -29,13 +28,13 @@ class PhotoViewer extends StatelessWidget {
       body: PhotoViewGallery.builder(
         scrollPhysics: const BouncingScrollPhysics(),
         builder: (BuildContext context, int index) {
-          final url = '${ApiConfig.imageUrl}${photos[index]['url']}';
+          final url = photos[index]['url'] ?? '';
           return PhotoViewGalleryPageOptions(
-            imageProvider: CachedNetworkImageProvider(url),
+            imageProvider: ImageLoader.provider(url),
             initialScale: PhotoViewComputedScale.contained,
             minScale: PhotoViewComputedScale.contained * 0.8,
             maxScale: PhotoViewComputedScale.covered * 2,
-            heroAttributes: PhotoViewHeroAttributes(tag: photos[index]['url']!),
+            heroAttributes: PhotoViewHeroAttributes(tag: url),
           );
         },
         itemCount: photos.length,

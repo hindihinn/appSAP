@@ -27,6 +27,29 @@ class VehicleService {
     }
   }
 
+  Future<Map<String, dynamic>> getVehiclesByDate({required String dateFrom, required String dateTo}) async {
+    try {
+      final response = await _apiService.client.get(
+        '/vehicles/stats/by-date',
+        queryParameters: {
+          'date_from': dateFrom,
+          'date_to': dateTo,
+        },
+      );
+
+      if (response.data['success']) {
+        final List data = response.data['data'];
+        return {
+          'success': true,
+          'data': data.map((e) => Vehicle.fromJson(e)).toList(),
+        };
+      }
+      return {'success': false, 'message': response.data['message']};
+    } catch (e) {
+      return {'success': false, 'message': 'Network error'};
+    }
+  }
+
   Future<Map<String, dynamic>> getVehicleDetail(int id) async {
     try {
       final response = await _apiService.client.get('/vehicles/$id');

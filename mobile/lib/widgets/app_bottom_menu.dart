@@ -109,7 +109,7 @@ class AppBottomMenu extends StatelessWidget {
                   const SizedBox(height: 12),
                   _buildSectionHeader('Operasional Gudang'),
                   _buildMenuItem(context, icon: Icons.add_box_rounded, title: 'Buat Order Dinas', route: AppRoutes.createOrder),
-                  _buildMenuItem(context, icon: Icons.list_alt_rounded, title: 'History Order', route: null),
+                  _buildMenuItem(context, icon: Icons.list_alt_rounded, title: 'History Order', route: AppRoutes.orderHistory),
                 ],
 
                 if (user?.roleId == 5) ...[
@@ -117,6 +117,10 @@ class AppBottomMenu extends StatelessWidget {
                   _buildSectionHeader('Tugas Driver'),
                   _buildMenuItem(context, icon: Icons.local_shipping_rounded, title: 'Tugas Perjalanan', route: AppRoutes.driverTasks),
                   _buildMenuItem(context, icon: Icons.history_rounded, title: 'History Perjalanan', route: null),
+                  const SizedBox(height: 12),
+                  _buildSectionHeader('Pemeliharaan Kendaraan'),
+                  _buildMenuItem(context, icon: Icons.report_problem_rounded, title: 'Laporkan Kerusakan', route: AppRoutes.reportDamage),
+                  _buildMenuItem(context, icon: Icons.build_circle_rounded, title: 'Tugas Perbaikan', route: AppRoutes.driverWOTasks),
                 ],
                 
                 const SizedBox(height: 16),

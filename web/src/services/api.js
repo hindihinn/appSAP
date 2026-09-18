@@ -23,4 +23,11 @@ api.interceptors.response.use(
   }
 );
 
+export const getImageUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('data:')) return url;
+  const apiBase = api.defaults.baseURL ? api.defaults.baseURL.replace(/\/api$/, '') : '';
+  return `${apiBase}${url}`;
+};
+
 export default api;

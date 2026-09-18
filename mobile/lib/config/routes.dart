@@ -7,6 +7,10 @@ import '../screens/vehicles/vehicle_legality_screen.dart';
 import '../screens/vehicles/vehicle_km_screen.dart';
 import '../screens/trips/create_order_screen.dart';
 import '../screens/trips/driver_tasks_screen.dart';
+import '../screens/trips/order_history_screen.dart';
+import '../screens/settings/api_settings_screen.dart';
+import '../screens/services/report_damage_screen.dart';
+import '../screens/services/driver_wo_tasks_screen.dart';
 
 class AppRoutes {
   static const String splash = '/';
@@ -17,6 +21,10 @@ class AppRoutes {
   static const String vehicleKm = '/vehicles/km';
   static const String createOrder = '/trips/create';
   static const String driverTasks = '/trips/driver-tasks';
+  static const String orderHistory = '/trips/history';
+  static const String apiSettings = '/settings/api';
+  static const String reportDamage = '/services/report-damage';
+  static const String driverWOTasks = '/services/wo-tasks';
 
   static Map<String, WidgetBuilder> get routes => {
     splash: (context) => const SplashScreen(),
@@ -27,5 +35,9 @@ class AppRoutes {
     vehicleKm: (context) => const VehicleKmScreen(),
     createOrder: (context) => const CreateOrderScreen(),
     driverTasks: (context) => const DriverTasksScreen(),
+    orderHistory: (context) => const OrderHistoryScreen(),
+    apiSettings: (context) => const ApiSettingsScreen(),
+    reportDamage: (context) => const ReportDamageScreen(),
+    driverWOTasks: (context) => const DriverWOTasksScreen(),
   };
 }

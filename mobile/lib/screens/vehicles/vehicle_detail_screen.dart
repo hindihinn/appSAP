@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../widgets/image_loader.dart';
 import '../../models/vehicle.dart';
 import '../../config/theme.dart';
 import '../../config/api_config.dart';
@@ -39,11 +39,15 @@ class VehicleDetailScreen extends StatelessWidget {
     if (vehicle.photoRight != null) photos.add({'url': vehicle.photoRight!, 'desc': 'Tampak Kanan'});
 
     return Scaffold(
+      backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: const Text('Detail Kendaraan'),
+        title: const Text('Detail Kendaraan', style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: AppTheme.textPrimary),
         actions: [
           IconButton(
-            icon: const Icon(Icons.edit_outlined),
+            icon: const Icon(Icons.edit_outlined, color: AppTheme.textPrimary),
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Edit coming soon')));
             },
@@ -57,14 +61,21 @@ class VehicleDetailScreen extends StatelessWidget {
           children: [
             // Header Card
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [AppTheme.primaryDark, AppTheme.primary],
+                  colors: [AppTheme.primaryDark, Color(0xFF1E3A8A), AppTheme.primary],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primary.withOpacity(0.2),
+                    blurRadius: 15,
+                    offset: const Offset(0, 8),
+                  )
+                ],
               ),
               child: Row(
                 children: [
@@ -75,7 +86,7 @@ class VehicleDetailScreen extends StatelessWidget {
                       color: Colors.white.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(Icons.directions_car, color: Colors.white, size: 28),
+                    child: const Icon(Icons.local_shipping_outlined, color: Colors.white, size: 28),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -84,12 +95,12 @@ class VehicleDetailScreen extends StatelessWidget {
                       children: [
                         Text(
                           '${vehicle.merk} ${vehicle.model ?? ''}',
-                          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: -0.5),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           '${vehicle.nopol} ${vehicle.vehicleCode != null ? '• ${vehicle.vehicleCode}' : ''}',
-                          style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14),
+                          style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14, fontWeight: FontWeight.w600),
                         ),
                       ],
                     ),
@@ -97,13 +108,12 @@ class VehicleDetailScreen extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: statusColor.withOpacity(0.3)),
+                      color: statusColor.withOpacity(0.25),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       statusLabel,
-                      style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.bold),
+                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800),
                     ),
                   ),
                 ],
@@ -142,11 +152,9 @@ class VehicleDetailScreen extends StatelessWidget {
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
-                            CachedNetworkImage(
-                              imageUrl: '${ApiConfig.imageUrl}${photo['url']}',
+                            ImageLoader.load(
+                              photo['url'],
                               fit: BoxFit.cover,
-                              placeholder: (context, url) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                              errorWidget: (context, url, error) => const Icon(Icons.broken_image, color: AppTheme.textMuted),
                             ),
                             Positioned(
                               bottom: 0,

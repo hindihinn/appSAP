@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../widgets/image_loader.dart';
 import '../../services/vehicle_service.dart';
 import '../../services/api_service.dart';
 import '../../config/theme.dart';
@@ -46,11 +46,15 @@ class _VehicleKmScreenState extends State<VehicleKmScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: const Text('Monitoring KM'),
+        title: const Text('Monitoring KM', style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: AppTheme.textPrimary),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add_outlined),
+            icon: const Icon(Icons.add_outlined, color: AppTheme.textPrimary),
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Input KM coming soon')));
             },
@@ -79,8 +83,16 @@ class _VehicleKmScreenState extends State<VehicleKmScreen> {
     final recordedDate = log['recorded_date'] != null ? DateTime.parse(log['recorded_date']) : null;
     final kmDiff = (log['km_reading'] ?? 0) - (log['previous_km'] ?? 0);
     
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.01), blurRadius: 10, offset: const Offset(0, 4))
+        ],
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
@@ -91,9 +103,9 @@ class _VehicleKmScreenState extends State<VehicleKmScreen> {
               height: 48,
               decoration: BoxDecoration(
                 color: AppTheme.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
+                shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.speed, color: AppTheme.primary),
+              child: const Icon(Icons.speed_rounded, color: AppTheme.primary),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -105,11 +117,11 @@ class _VehicleKmScreenState extends State<VehicleKmScreen> {
                     children: [
                       Text(
                         log['nopol'] ?? '-',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.textPrimary),
                       ),
                       Text(
                         recordedDate != null ? DateFormat('dd MMM, HH:mm').format(recordedDate) : '-',
-                        style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                        style: const TextStyle(color: AppTheme.textMuted, fontSize: 12, fontWeight: FontWeight.w500),
                       ),
                     ],
                   ),
@@ -118,20 +130,20 @@ class _VehicleKmScreenState extends State<VehicleKmScreen> {
                     '${log['merk'] ?? ''}',
                     style: const TextStyle(color: AppTheme.textSecondary, fontSize: 14),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   Row(
                     children: [
                       Text(
                         '${NumberFormat('#,###').format(log['km_reading'] ?? 0)} km',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.primary),
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: AppTheme.primary),
                       ),
                       if (kmDiff > 0) ...[
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: AppTheme.success.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(4),
+                            color: AppTheme.success.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             '+${NumberFormat('#,###').format(kmDiff)}',
@@ -141,21 +153,21 @@ class _VehicleKmScreenState extends State<VehicleKmScreen> {
                       ]
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   Row(
                     children: [
-                      const Icon(Icons.person_outline, size: 14, color: AppTheme.textMuted),
+                      const Icon(Icons.person_outline_rounded, size: 14, color: AppTheme.textMuted),
                       const SizedBox(width: 4),
                       Text(
                         log['recorded_by_name'] ?? 'System',
-                        style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                        style: const TextStyle(fontSize: 12, color: AppTheme.textMuted, fontWeight: FontWeight.w500),
                       ),
                       const SizedBox(width: 12),
                       const Icon(Icons.source_outlined, size: 14, color: AppTheme.textMuted),
                       const SizedBox(width: 4),
                       Text(
                         (log['source'] ?? '').toUpperCase(),
-                        style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                        style: const TextStyle(fontSize: 12, color: AppTheme.textMuted, fontWeight: FontWeight.w500),
                       ),
                     ],
                   ),
@@ -165,14 +177,12 @@ class _VehicleKmScreenState extends State<VehicleKmScreen> {
             if (log['photo'] != null) ...[
               const SizedBox(width: 12),
               ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: CachedNetworkImage(
-                  imageUrl: '${ApiConfig.imageUrl}${log['photo']}',
+                borderRadius: BorderRadius.circular(10),
+                child: ImageLoader.load(
+                  log['photo'],
                   width: 60,
                   height: 60,
                   fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(color: Colors.grey[200]),
-                  errorWidget: (context, url, error) => Container(color: Colors.grey[200], child: const Icon(Icons.broken_image, size: 20, color: Colors.grey)),
                 ),
               ),
             ]

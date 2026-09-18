@@ -4,6 +4,7 @@ import Layout from './components/Layout/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import VehicleList from './pages/vehicles/VehicleList';
+import FuelManagement from './pages/vehicles/FuelManagement';
 import VehicleLegality from './pages/vehicles/VehicleLegality';
 import VehicleKm from './pages/vehicles/VehicleKm';
 import DriverList from './pages/hr/DriverList';
@@ -17,6 +18,7 @@ import WorkOrder from './pages/services/WorkOrder';
 import RoutineService from './pages/services/RoutineService';
 import ServiceManagement from './pages/services/ServiceManagement';
 import ServiceHistory from './pages/services/ServiceHistory';
+import ReportService from './pages/services/ReportService';
 import ReimburseMonitoring from './pages/reimbursement/ReimburseMonitoring';
 import ReimburseHistory from './pages/reimbursement/ReimburseHistory';
 import Organizations from './pages/settings/Organizations';
@@ -39,6 +41,7 @@ function AppRoutes() {
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Dashboard />} />
         <Route path="vehicles/units" element={<VehicleList />} />
+        <Route path="vehicles/fuel" element={<FuelManagement />} />
         <Route path="vehicles/legality" element={<VehicleLegality />} />
         <Route path="vehicles/km" element={<VehicleKm />} />
         <Route path="hr/drivers" element={<DriverList />} />
@@ -48,6 +51,7 @@ function AppRoutes() {
         <Route path="trips/approval" element={<ApprovalDinas />} />
         <Route path="trips/monitoring" element={<TripMonitoring />} />
         <Route path="trips/report" element={<TripReport />} />
+        <Route path="services/reports" element={<ReportService />} />
         <Route path="services/work-orders" element={<WorkOrder />} />
         <Route path="services/routine" element={<RoutineService />} />
         <Route path="services/management" element={<ServiceManagement />} />

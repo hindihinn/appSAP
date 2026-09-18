@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import api from '../../services/api';
+import api, { getImageUrl } from '../../services/api';
 import DataTable from '../../components/common/DataTable';
 import Modal from '../../components/common/Modal';
 import StatusBadge from '../../components/common/StatusBadge';
+import { FaHistory, FaClipboardList, FaCarSide, FaFlagCheckered, FaCheckCircle, FaSync } from 'react-icons/fa';
 
 export default function TripHistory() {
   const [data, setData] = useState([]);
@@ -13,13 +14,18 @@ export default function TripHistory() {
   const arrKm = detail?.arrival_km || detail?.checkpoints?.find(cp => cp.type === 'unloading' || cp.type === 'arrival')?.km_reading;
   const retKm = detail?.return_km || detail?.checkpoints?.find(cp => cp.type === 'return_arrival')?.km_reading;
 
-  useEffect(() => { 
+  const loadData = () => {
+    setLoading(true);
     api.get('/trips')
       .then(r => { 
-        setData(r.data.data); 
+        setData(r.data.data || []); 
         setLoading(false); 
       })
-      .catch(() => setLoading(false)); 
+      .catch(() => setLoading(false));
+  };
+
+  useEffect(() => { 
+    loadData();
   }, []);
 
   const openDetail = async (id) => {
@@ -42,14 +48,105 @@ export default function TripHistory() {
     { key: 'created_at', label: 'Dibuat', render: v => new Date(v).toLocaleDateString('id-ID') },
   ];
 
+  // Calculate metrics
+  const totalTrips = data.length;
+  const activeTrips = data.filter(t => t.status === 'in_progress').length;
+  const completedTrips = data.filter(t => t.status === 'completed').length;
+  const approvedTrips = data.filter(t => t.status === 'approved').length;
+
   return (
     <div>
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">History Dinas</h1>
-          <p className="page-subtitle">Riwayat seluruh order dinas</p>
+      {/* ══ HERO HEADER BANNER (TRIP HISTORY - INDIGO THEME) ══ */}
+      <div style={{
+        background: 'var(--gradient-trips)',
+        borderRadius: 20, 
+        padding: '28px 32px', 
+        marginBottom: 28,
+        position: 'relative', 
+        overflow: 'hidden',
+        boxShadow: 'var(--shadow-lg)',
+      }}>
+        {/* Background decorative translucent circles */}
+        <div style={{ position: 'absolute', top: -50, right: -50, width: 220, height: 220, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: -70, left: '38%', width: 260, height: 260, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', pointerEvents: 'none' }} />
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16, position: 'relative' }}>
+          {/* Title & Icon Section */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{
+              width: 50, 
+              height: 50, 
+              borderRadius: 14,
+              background: 'rgba(255,255,255,0.15)', 
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255,255,255,0.25)',
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+            }}>
+              <FaHistory size={22} style={{ color: '#fff' }} />
+            </div>
+            <div>
+              <h1 style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: 0, letterSpacing: '-0.5px' }}>
+                History Dinas
+              </h1>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', margin: '4px 0 0' }}>
+                Arsip dan riwayat seluruh data perjalanan dinas operasional perusahaan
+              </p>
+            </div>
+          </div>
+
+          {/* Action Area & Buttons */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <button onClick={loadData} style={{
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 8,
+              background: 'rgba(255,255,255,0.15)', 
+              border: '1px solid rgba(255,255,255,0.25)',
+              color: '#fff', 
+              padding: '9px 18px', 
+              borderRadius: 10, 
+              cursor: 'pointer',
+              fontSize: 13, 
+              fontWeight: 600, 
+              backdropFilter: 'blur(10px)', 
+              transition: 'all 0.2s',
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+            >
+              <FaSync size={12} />
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        {/* Translucent Glassmorphic Metric Cards Row */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginTop: 22 }}>
+          {[
+            { label: 'Total Order', val: totalTrips, icon: <FaClipboardList size={20} /> },
+            { label: 'Dinas Aktif', val: activeTrips, icon: <FaCarSide size={20} /> },
+            { label: 'Selesai', val: completedTrips, icon: <FaFlagCheckered size={20} /> },
+            { label: 'Disetujui', val: approvedTrips, icon: <FaCheckCircle size={20} /> },
+          ].map((s, i) => (
+            <div key={i} style={{
+              background: 'rgba(255,255,255,0.12)', 
+              border: '1px solid rgba(255,255,255,0.15)',
+              borderRadius: 12, 
+              padding: '14px 16px', 
+              backdropFilter: 'blur(10px)',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ display: 'flex', alignItems: 'center', color: '#fff' }}>{s.icon}</span>
+                <span style={{ fontSize: 20, fontWeight: 800, color: '#fff' }}>{s.val}</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: 500 }}>{s.label}</div>
+            </div>
+          ))}
         </div>
       </div>
+
       <DataTable 
         columns={columns} 
         data={data} 
@@ -101,32 +198,32 @@ export default function TripHistory() {
                         <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
                           {cp.photo_km && (
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                              <a href={cp.photo_km} target="_blank" rel="noreferrer">
-                                <img src={cp.photo_km} alt="Foto KM" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)' }} />
+                              <a href={getImageUrl(cp.photo_km)} target="_blank" rel="noreferrer">
+                                <img src={getImageUrl(cp.photo_km)} alt="Foto KM" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)' }} />
                               </a>
                               <span style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>Foto KM</span>
                             </div>
                           )}
                           {cp.photo_nota && (
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                              <a href={cp.photo_nota} target="_blank" rel="noreferrer">
-                                <img src={cp.photo_nota} alt="Foto Nota" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)' }} />
+                              <a href={getImageUrl(cp.photo_nota)} target="_blank" rel="noreferrer">
+                                <img src={getImageUrl(cp.photo_nota)} alt="Foto Nota" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)' }} />
                               </a>
                               <span style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>Foto Nota</span>
                             </div>
                           )}
                           {cp.photo_pump && (
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                              <a href={cp.photo_pump} target="_blank" rel="noreferrer">
-                                <img src={cp.photo_pump} alt="Foto Dispenser" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)' }} />
+                              <a href={getImageUrl(cp.photo_pump)} target="_blank" rel="noreferrer">
+                                <img src={getImageUrl(cp.photo_pump)} alt="Foto Dispenser" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)' }} />
                               </a>
                               <span style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>Dispenser</span>
                             </div>
                           )}
                           {cp.photo_activity && (
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                              <a href={cp.photo_activity} target="_blank" rel="noreferrer">
-                                <img src={cp.photo_activity} alt="Foto Aktivitas" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)' }} />
+                              <a href={getImageUrl(cp.photo_activity)} target="_blank" rel="noreferrer">
+                                <img src={getImageUrl(cp.photo_activity)} alt="Foto Aktivitas" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)' }} />
                               </a>
                               <span style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>Aktivitas</span>
                             </div>

@@ -3,10 +3,14 @@ import '../config/api_config.dart';
 import 'storage_service.dart';
 
 class ApiService {
-  late final Dio _dio;
+  late Dio _dio;
 
   ApiService() {
-    _dio = Dio(BaseOptions(
+    _dio = _buildDio();
+  }
+
+  Dio _buildDio() {
+    final dio = Dio(BaseOptions(
       baseUrl: ApiConfig.baseUrl,
       connectTimeout: const Duration(milliseconds: ApiConfig.connectTimeout),
       receiveTimeout: const Duration(milliseconds: ApiConfig.receiveTimeout),
@@ -15,8 +19,11 @@ class ApiService {
       },
     ));
 
-    _dio.interceptors.add(InterceptorsWrapper(
+    dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
+        // Selalu ambil baseUrl terbaru — handle perubahan IP saat runtime
+        options.baseUrl = ApiConfig.baseUrl;
+
         final token = await StorageService.getToken();
         if (token != null) {
           options.headers['Authorization'] = 'Bearer $token';
@@ -31,11 +38,17 @@ class ApiService {
           // Token expired or invalid
           await StorageService.removeToken();
           await StorageService.removeUserData();
-          // We can also trigger a global event here to navigate to login
         }
         return handler.next(e);
       },
     ));
+
+    return dio;
+  }
+
+  /// Rebuild Dio client dengan URL baru — panggil setelah ganti IP
+  void refreshBaseUrl() {
+    _dio = _buildDio();
   }
 
   Dio get client => _dio;

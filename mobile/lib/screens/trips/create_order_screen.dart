@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import 'package:dio/dio.dart';
 import '../../config/theme.dart';
 import '../../providers/vehicle_provider.dart';
 import '../../providers/trip_provider.dart';
-import '../../services/api_service.dart';
-import '../../widgets/app_drawer.dart';
 
 class CreateOrderScreen extends StatefulWidget {
   const CreateOrderScreen({super.key});
@@ -18,7 +15,8 @@ class CreateOrderScreen extends StatefulWidget {
 class _CreateOrderScreenState extends State<CreateOrderScreen> {
   final _formKey = GlobalKey<FormState>();
   DateTime? _selectedDate;
-  
+  DateTime? _selectedReturnDate;
+
   final _unitCountController = TextEditingController(text: '1');
   final _itemsController = TextEditingController();
   final _notesController = TextEditingController();
@@ -35,7 +33,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<VehicleProvider>().fetchVehicles(); // Fetch ALL vehicles for summary
+      context.read<VehicleProvider>().clearVehiclesByDate();
       _fetchCompanies();
     });
   }
@@ -60,7 +58,9 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
       }
     } catch (e) {
       setState(() => _isLoadingOrgs = false);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gagal memuat daftar PT')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Gagal memuat daftar PT')));
     }
   }
 
@@ -79,45 +79,85 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
         });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gagal memuat daftar Unit/Cabang')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gagal memuat daftar Unit/Gudang')),
+      );
     }
   }
 
-  Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
+  Future<void> _selectDateRange(BuildContext context) async {
+    final vehicleProvider = context.read<VehicleProvider>();
+    final DateTimeRange? picked = await showDateRangePicker(
       context: context,
-      initialDate: DateTime.now().add(const Duration(days: 1)),
-      firstDate: DateTime.now(),
+      firstDate: DateTime.now().subtract(const Duration(days: 1)),
       lastDate: DateTime.now().add(const Duration(days: 90)),
+      initialDateRange: _selectedDate != null && _selectedReturnDate != null
+          ? DateTimeRange(start: _selectedDate!, end: _selectedReturnDate!)
+          : null,
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(primary: AppTheme.primary),
-            textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(foregroundColor: AppTheme.primary)),
+            colorScheme: const ColorScheme.light(
+              primary: AppTheme.primary,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: AppTheme.textPrimary,
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(foregroundColor: AppTheme.primary),
+            ),
           ),
           child: child!,
         );
       },
     );
-    if (picked != null && picked != _selectedDate) {
-      setState(() => _selectedDate = picked);
+
+    if (picked != null) {
+      setState(() {
+        _selectedDate = picked.start;
+        _selectedReturnDate = picked.end;
+      });
+      _fetchStatsIfDatesSelected(vehicleProvider);
+    }
+  }
+
+  void _fetchStatsIfDatesSelected(VehicleProvider vehicleProvider) {
+    if (_selectedDate != null && _selectedReturnDate != null) {
+      final formattedFrom = DateFormat('yyyy-MM-dd').format(_selectedDate!);
+      final formattedTo = DateFormat('yyyy-MM-dd').format(_selectedReturnDate!);
+      vehicleProvider.fetchVehiclesByDate(
+        dateFrom: formattedFrom,
+        dateTo: formattedTo,
+      );
+    } else {
+      vehicleProvider.clearVehiclesByDate();
     }
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pilih tanggal keberangkatan')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pilih tanggal keberangkatan')),
+      );
+      return;
+    }
+    if (_selectedReturnDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pilih tanggal rencana kembali')),
+      );
       return;
     }
     if (_selectedCompanyId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pilih PT Tujuan')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Pilih PT Tujuan')));
       return;
     }
 
     try {
       final tripProvider = context.read<TripProvider>();
-      
+
       // We send the destination as a combined string for the API
       String dest = _selectedCompanyName ?? '';
       if (_selectedUnitName != null && _selectedUnitName!.isNotEmpty) {
@@ -129,35 +169,60 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
         'unit_id': _selectedUnitId,
         'vehicle_id': null,
         'destination': dest,
-        'purpose': _notesController.text.isNotEmpty ? _notesController.text : 'Order Pengiriman',
-        'items_description': '[Butuh ${_unitCountController.text} Unit] - ${_itemsController.text}',
-        'planned_departure': DateFormat('yyyy-MM-dd HH:mm:ss').format(_selectedDate!),
+        'purpose': _notesController.text.isNotEmpty
+            ? _notesController.text
+            : 'Order Pengiriman',
+        'items_description':
+            '[Butuh ${_unitCountController.text} Unit] - ${_itemsController.text}',
+        'planned_departure': DateFormat(
+          'yyyy-MM-dd HH:mm:ss',
+        ).format(_selectedDate!),
+        'planned_return': DateFormat(
+          'yyyy-MM-dd HH:mm:ss',
+        ).format(_selectedReturnDate!),
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Order berhasil dibuat'), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Order berhasil dibuat'),
+            backgroundColor: Colors.green,
+          ),
+        );
         Navigator.pop(context);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final vehicles = context.watch<VehicleProvider>().vehicles;
+    final vehicleProvider = context.watch<VehicleProvider>();
+    final vehicles = vehicleProvider.vehiclesByDate;
     final isLoading = context.watch<TripProvider>().isLoading;
+    final isLoadingVehicles = vehicleProvider.isLoadingByDate;
 
-    final standbyVehicles = vehicles.where((v) => v.status == 'available').toList();
+    final standbyVehicles = vehicles
+        .where((v) => v.status == 'available')
+        .toList();
     final dinasVehicles = vehicles.where((v) => v.status == 'in_use').toList();
-    final maintenanceVehicles = vehicles.where((v) => v.status == 'maintenance').toList();
+    final maintenanceVehicles = vehicles
+        .where((v) => v.status == 'maintenance')
+        .toList();
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: const Text('Buat Order Dinas', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Buat Order Dinas',
+          style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.5),
+        ),
         elevation: 0,
-        backgroundColor: AppTheme.primaryDark,
+        backgroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: AppTheme.textPrimary),
         centerTitle: true,
       ),
       body: Form(
@@ -165,39 +230,204 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            // Keterangan Total Unit
-            Container(
-              padding: const EdgeInsets.all(20),
-              margin: const EdgeInsets.only(bottom: 24),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.blue.shade50, Colors.white],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
+            _buildSectionTitle('Jadwal Perjalanan'),
+            // Tanggal Perjalanan (Range)
+            InkWell(
+              onTap: () => _selectDateRange(context),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 16,
                 ),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.blue.shade100),
-                boxShadow: [
-                  BoxShadow(color: Colors.blue.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))
-                ],
-              ),
-              child: Column(
-                children: [
-                  const Text('INFORMASI KETERSEDIAAN UNIT', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue, letterSpacing: 1, fontSize: 12)),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(child: _buildSummaryItem(context, 'Standby', standbyVehicles, Icons.check_circle, Colors.green)),
-                      const SizedBox(width: 8),
-                      Expanded(child: _buildSummaryItem(context, 'Jalan', dinasVehicles, Icons.local_shipping, Colors.orange)),
-                      const SizedBox(width: 8),
-                      Expanded(child: _buildSummaryItem(context, 'Service', maintenanceVehicles, Icons.build, Colors.red)),
-                    ],
-                  ),
-                ],
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.calendar_month_rounded,
+                      color: AppTheme.primary,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Tanggal Perjalanan',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _selectedDate != null && _selectedReturnDate != null
+                                ? (_selectedDate!.day ==
+                                              _selectedReturnDate!.day &&
+                                          _selectedDate!.month ==
+                                              _selectedReturnDate!.month &&
+                                          _selectedDate!.year ==
+                                              _selectedReturnDate!.year
+                                      ? DateFormat(
+                                          'EEEE, dd MMM yyyy',
+                                          'id_ID',
+                                        ).format(_selectedDate!)
+                                      : '${DateFormat('dd MMM', 'id_ID').format(_selectedDate!)} s.d ${DateFormat('dd MMM yyyy', 'id_ID').format(_selectedReturnDate!)}')
+                                : 'Pilih Tanggal Perjalanan',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: _selectedDate != null
+                                  ? AppTheme.textPrimary
+                                  : AppTheme.textMuted,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right, color: AppTheme.textMuted),
+                  ],
+                ),
               ),
             ),
-            
+            const SizedBox(height: 16),
+
+            // Keterangan Total Unit Dinamis Berdasarkan Rentang Tanggal
+            if (_selectedDate == null || _selectedReturnDate == null)
+              Container(
+                padding: const EdgeInsets.all(16),
+                margin: const EdgeInsets.only(bottom: 24),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.blue.shade100),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline_rounded,
+                      color: Colors.blue.shade700,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Pilih tanggal keberangkatan dan rencana kembali terlebih dahulu untuk melihat ketersediaan unit.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.blue.shade900,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else if (isLoadingVehicles)
+              Container(
+                padding: const EdgeInsets.all(24),
+                margin: const EdgeInsets.only(bottom: 24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: const Center(
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2.5),
+                      ),
+                      SizedBox(height: 12),
+                      Text(
+                        'Memuat ketersediaan unit...',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.all(20),
+                margin: const EdgeInsets.only(bottom: 24),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.blue.shade50, Colors.white],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.blue.shade100),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.blue.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      'INFORMASI KETERSEDIAAN UNIT RENTANG ${DateFormat('dd MMM', 'id_ID').format(_selectedDate!).toUpperCase()} S.D ${DateFormat('dd MMM yyyy', 'id_ID').format(_selectedReturnDate!).toUpperCase()}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
+                        letterSpacing: 0.5,
+                        fontSize: 11,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildSummaryItem(
+                            context,
+                            'Standby',
+                            standbyVehicles,
+                            Icons.check_circle,
+                            Colors.green,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildSummaryItem(
+                            context,
+                            'Jalan',
+                            dinasVehicles,
+                            Icons.local_shipping,
+                            Colors.orange,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildSummaryItem(
+                            context,
+                            'Service',
+                            maintenanceVehicles,
+                            Icons.build,
+                            Colors.red,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
             _buildSectionTitle('Detail Kebutuhan'),
             _buildTextField(
               controller: _unitCountController,
@@ -209,11 +439,11 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
             const SizedBox(height: 16),
             _buildTextField(
               controller: _itemsController,
-              label: 'Deskripsi Barang / Tonase',
+              label: 'Tujuan Keberangkatan',
               icon: Icons.inventory_2_rounded,
               maxLines: 2,
             ),
-            
+
             const SizedBox(height: 24),
             _buildSectionTitle('Tujuan Pengiriman'),
             _buildDropdown(
@@ -225,60 +455,33 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
               onChanged: (val) {
                 setState(() {
                   _selectedCompanyId = val;
-                  _selectedCompanyName = _companies.firstWhere((c) => c['id'] == val)['name'];
+                  _selectedCompanyName = _companies.firstWhere(
+                    (c) => c['id'] == val,
+                  )['name'];
                 });
                 _fetchUnits(val as int);
               },
             ),
             const SizedBox(height: 16),
             _buildDropdown(
-              label: 'Pilih Unit / Cabang',
-              icon: Icons.store_rounded,
+              label: 'Pilih Unit / Gudang',
+              icon: Icons.business_rounded,
               value: _selectedUnitId,
               items: _units,
-              onChanged: _selectedCompanyId == null ? null : (val) {
-                setState(() {
-                  _selectedUnitId = val;
-                  _selectedUnitName = _units.firstWhere((u) => u['id'] == val)['name'];
-                });
-              },
+              onChanged: _selectedCompanyId == null
+                  ? null
+                  : (val) {
+                      setState(() {
+                        _selectedUnitId = val;
+                        _selectedUnitName = _units.firstWhere(
+                          (u) => u['id'] == val,
+                        )['name'];
+                      });
+                    },
             ),
-            
+
             const SizedBox(height: 24),
-            _buildSectionTitle('Jadwal & Keterangan'),
-            InkWell(
-              onTap: () => _selectDate(context),
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.calendar_month_rounded, color: AppTheme.primary),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Tanggal Keberangkatan', style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 4),
-                          Text(
-                            _selectedDate != null ? DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(_selectedDate!) : 'Pilih Tanggal',
-                            style: TextStyle(fontSize: 16, color: _selectedDate != null ? Colors.black87 : Colors.grey, fontWeight: FontWeight.w500),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(Icons.chevron_right, color: Colors.grey),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
+            _buildSectionTitle('Keterangan'),
             _buildTextField(
               controller: _notesController,
               label: 'Keterangan Tambahan (Opsional)',
@@ -286,7 +489,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
               maxLines: 3,
               isRequired: false,
             ),
-            
+
             const SizedBox(height: 40),
             Row(
               children: [
@@ -296,10 +499,19 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                     onPressed: () => Navigator.pop(context),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       side: BorderSide(color: Colors.grey.shade400),
                     ),
-                    child: const Text('Batal', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black54)),
+                    child: const Text(
+                      'Batal',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black54,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -310,13 +522,29 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.primary,
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       elevation: 4,
                       shadowColor: AppTheme.primary.withOpacity(0.5),
                     ),
                     child: isLoading
-                        ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
-                        : const Text('Buat Order Sekarang', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 3,
+                            ),
+                          )
+                        : const Text(
+                            'Buat Order Sekarang',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
                   ),
                 ),
               ],
@@ -333,7 +561,11 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
       padding: const EdgeInsets.only(bottom: 12),
       child: Text(
         title,
-        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.primaryDark),
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          color: AppTheme.primaryDark,
+        ),
       ),
     );
   }
@@ -359,11 +591,22 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
         suffixText: suffixText,
         filled: true,
         fillColor: Colors.white,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.primary, width: 2)),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppTheme.primary, width: 2),
+        ),
       ),
-      validator: isRequired ? (val) => val == null || val.isEmpty ? 'Wajib diisi' : null : null,
+      validator: isRequired
+          ? (val) => val == null || val.isEmpty ? 'Wajib diisi' : null
+          : null,
     );
   }
 
@@ -379,30 +622,59 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(color: Colors.grey.shade600),
-        prefixIcon: isLoading 
-            ? const Padding(padding: EdgeInsets.all(12), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
+        prefixIcon: isLoading
+            ? const Padding(
+                padding: EdgeInsets.all(12),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
             : Icon(icon, color: AppTheme.primary),
         filled: true,
         fillColor: Colors.white,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.primary, width: 2)),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppTheme.primary, width: 2),
+        ),
       ),
       value: value,
       items: items.map((item) {
         return DropdownMenuItem(
           value: item['id'],
-          child: Text(item['name'], style: const TextStyle(fontWeight: FontWeight.w500)),
+          child: Text(
+            item['name'],
+            style: const TextStyle(fontWeight: FontWeight.w500),
+          ),
         );
       }).toList(),
       onChanged: onChanged,
       validator: (val) => val == null ? 'Wajib dipilih' : null,
       isExpanded: true,
-      icon: const Icon(Icons.arrow_drop_down_rounded, color: AppTheme.primary, size: 30),
+      icon: const Icon(
+        Icons.arrow_drop_down_rounded,
+        color: AppTheme.primary,
+        size: 30,
+      ),
     );
   }
 
-  Widget _buildSummaryItem(BuildContext context, String label, List<dynamic> items, IconData icon, Color color) {
+  Widget _buildSummaryItem(
+    BuildContext context,
+    String label,
+    List<dynamic> items,
+    IconData icon,
+    Color color,
+  ) {
     return GestureDetector(
       onLongPress: () {
         _showVehicleList(context, label, items, color);
@@ -411,29 +683,61 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.3)),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
           boxShadow: [
-            BoxShadow(color: color.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))
+            BoxShadow(
+              color: Colors.black.withOpacity(0.02),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
           ],
         ),
         child: Column(
           children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(height: 8),
-            Text(items.length.toString(), style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              items.length.toString(),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
             const SizedBox(height: 4),
-            Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textSecondary,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  void _showVehicleList(BuildContext context, String label, List<dynamic> items, Color color) {
+  void _showVehicleList(
+    BuildContext context,
+    String label,
+    List<dynamic> items,
+    Color color,
+  ) {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (ctx) {
         return Container(
           padding: const EdgeInsets.all(20),
@@ -445,12 +749,31 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(4)))),
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
               const SizedBox(height: 16),
-              Text('Daftar Unit $label', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+              Text(
+                'Daftar Unit $label',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
               const Divider(height: 24),
               if (items.isEmpty)
-                const Padding(padding: EdgeInsets.all(16), child: Center(child: Text('Tidak ada unit')))
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Center(child: Text('Tidak ada unit')),
+                )
               else
                 Flexible(
                   child: ListView.builder(
@@ -460,8 +783,13 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                       final v = items[i];
                       return ListTile(
                         leading: Icon(Icons.directions_car, color: color),
-                        title: Text(v.nopol, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('${v.merk} ${v.model} - ${v.companyName ?? ''}'),
+                        title: Text(
+                          v.nopol,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          '${v.merk} ${v.model} - ${v.companyName ?? ''}',
+                        ),
                       );
                     },
                   ),

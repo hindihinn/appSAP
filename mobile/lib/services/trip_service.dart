@@ -4,6 +4,7 @@ import '../config/api_config.dart';
 class TripOrder {
   final int id;
   final String orderNumber;
+  final String? spdNumber;
   final String destination;
   final String purpose;
   final String? itemsDescription;
@@ -20,6 +21,7 @@ class TripOrder {
   TripOrder({
     required this.id,
     required this.orderNumber,
+    this.spdNumber,
     required this.destination,
     required this.purpose,
     this.itemsDescription,
@@ -38,6 +40,7 @@ class TripOrder {
     return TripOrder(
       id: json['id'],
       orderNumber: json['order_number'],
+      spdNumber: json['spd_number'],
       destination: json['destination'],
       purpose: json['purpose'],
       itemsDescription: json['items_description'],
@@ -52,6 +55,28 @@ class TripOrder {
       unitId: json['unit_id'],
     );
   }
+
+  String get statusLabel {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return 'MENUNGGU';
+      case 'admin_review':
+        return 'REVIEW ADMIN';
+      case 'waiting_hrga':
+        return 'REVIEW HRGA';
+      case 'approved':
+        return 'DISETUJUI';
+      case 'in_progress':
+        return 'BERJALAN';
+      case 'completed':
+        return 'SELESAI';
+      case 'cancelled':
+      case 'rejected':
+        return 'DITOLAK';
+      default:
+        return status.replaceAll('_', ' ').toUpperCase();
+    }
+  }
 }
 
 class TripService {
@@ -59,13 +84,14 @@ class TripService {
 
   TripService(this.client);
 
-  Future<List<TripOrder>> getTrips({String? status, int? driverId}) async {
+  Future<List<TripOrder>> getTrips({String? status, int? driverId, int? requesterId}) async {
     try {
       final response = await client.get(
         '/trips',
         queryParameters: {
           if (status != null) 'status': status,
           if (driverId != null) 'driver_id': driverId,
+          if (requesterId != null) 'requester_id': requesterId,
         },
       );
       if (response.data['success']) {
@@ -86,6 +112,17 @@ class TripService {
       }
     } catch (e) {
       throw Exception('Gagal membuat order: $e');
+    }
+  }
+
+  Future<void> withdrawOrder(int tripId) async {
+    try {
+      final response = await client.put('/trips/$tripId/withdraw');
+      if (!response.data['success']) {
+        throw Exception(response.data['message']);
+      }
+    } catch (e) {
+      throw Exception('Gagal menarik order: $e');
     }
   }
 }

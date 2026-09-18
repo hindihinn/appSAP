@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 /* ── SVG Icon Components ── */
 const Icon = ({ d, size = 18, color = 'currentColor' }) => (
@@ -47,8 +48,10 @@ const menuItems = [
     items: [
       {
         icon: 'truck', text: 'Kendaraan', path: '/vehicles',
+        permission: 'vehicles.view',
         sub: [
           { icon: 'vehicleList', text: 'Unit Kendaraan', path: '/vehicles/units' },
+          { icon: 'dollar', text: 'Bahan Bakar', path: '/vehicles/fuel' },
           { icon: 'shield', text: 'Legalitas', path: '/vehicles/legality' },
           { icon: 'gauge', text: 'Monitoring KM', path: '/vehicles/km' },
         ]
@@ -60,6 +63,7 @@ const menuItems = [
     items: [
       {
         icon: 'users', text: 'SDM / Driver', path: '/hr',
+        permission: 'drivers.view',
         sub: [
           { icon: 'userCard', text: 'Data Driver', path: '/hr/drivers' },
           { icon: 'award', text: 'Legalitas Driver', path: '/hr/legality' },
@@ -73,10 +77,11 @@ const menuItems = [
     items: [
       {
         icon: 'clipboard', text: 'Manajemen Dinas', path: '/trips',
+        permission: 'trips.view',
         sub: [
           { icon: 'mapPin', text: 'Monitoring Dinas', path: '/trips/monitoring' },
-          { icon: 'filePlus', text: 'Create Dinas', path: '/trips/create-dinas' },
-          { icon: 'checkSquare', text: 'Approval Dinas', path: '/trips/approval' },
+          { icon: 'filePlus', text: 'Create Dinas', path: '/trips/create-dinas', permission: 'trips.create' },
+          { icon: 'checkSquare', text: 'Approval Dinas', path: '/trips/approval', permission: 'trips.approve_admin' },
           { icon: 'fileText', text: 'Report Dinas', path: '/trips/report' },
         ]
       }
@@ -87,10 +92,11 @@ const menuItems = [
     items: [
       {
         icon: 'wrench', text: 'Service', path: '/services',
+        permission: 'services.view',
         sub: [
-          { icon: 'tool', text: 'WO Service', path: '/services/work-orders' },
+          { icon: 'fileText', text: 'Report Service', path: '/services/reports' },
+          { icon: 'tool', text: 'WO Service', path: '/services/work-orders', permission: 'services.create' },
           { icon: 'calendar', text: 'Service Rutin', path: '/services/routine' },
-          { icon: 'settings2', text: 'Manajemen', path: '/services/management' },
           { icon: 'clock', text: 'History Service', path: '/services/history' },
         ]
       }
@@ -101,6 +107,7 @@ const menuItems = [
     items: [
       {
         icon: 'dollar', text: 'Reimbursement', path: '/reimbursements',
+        permission: 'reimburse.view',
         sub: [
           { icon: 'receipt', text: 'Monitoring', path: '/reimbursements/monitoring' },
           { icon: 'barChart', text: 'History', path: '/reimbursements/history' },
@@ -111,10 +118,11 @@ const menuItems = [
   {
     label: 'PENGATURAN',
     items: [
-      { icon: 'building', text: 'Organisasi', path: '/settings/organizations' },
-      { icon: 'shieldLock', text: 'Manajemen Role', path: '/settings/roles' },
+      { icon: 'building', text: 'Company', path: '/settings/organizations', permission: 'org.manage' },
+      { icon: 'shieldLock', text: 'Manajemen Role', path: '/settings/roles', permission: 'roles.manage' },
       { 
         icon: 'userCog', text: 'Pengguna', path: '/settings/users',
+        permission: 'roles.manage',
         sub: [
           { icon: 'users', text: 'User Web', path: '/settings/users/web' },
           { icon: 'userCard', text: 'User Mobile', path: '/settings/users/mobile' }
@@ -126,8 +134,9 @@ const menuItems = [
 
 export default function Sidebar({ collapsed, setCollapsed }) {
   const location = useLocation();
+  const { hasPermission } = useAuth();
   const [openMenus, setOpenMenus] = useState({
-    '/vehicles': true, '/hr': true, '/trips': true,
+    '/vehicles': false, '/hr': false, '/trips': false,
     '/services': false, '/reimbursements': false,
     '/settings/users': false
   });
@@ -135,27 +144,52 @@ export default function Sidebar({ collapsed, setCollapsed }) {
   const toggleMenu = (path) => setOpenMenus(prev => ({ ...prev, [path]: !prev[path] }));
   const isParentActive = (sub) => sub?.some(s => location.pathname === s.path);
 
+  // Filter menu groups and items based on permissions
+  const filteredMenuItems = menuItems.map(group => {
+    const filteredItems = group.items.map(item => {
+      if (item.permission && !hasPermission(item.permission)) {
+        return null;
+      }
+      if (item.sub) {
+        const filteredSub = item.sub.filter(subItem => {
+          if (subItem.permission && !hasPermission(subItem.permission)) {
+            return false;
+          }
+          return true;
+        });
+        if (filteredSub.length === 0) {
+          return null;
+        }
+        return { ...item, sub: filteredSub };
+      }
+      return item;
+    }).filter(Boolean);
+
+    if (filteredItems.length === 0) {
+      return null;
+    }
+    return { ...group, items: filteredItems };
+  }).filter(Boolean);
+
   return (
     <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
       {/* Logo */}
-      <div className="sidebar-logo">
-        <div className="logo-icon-wrap">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="url(#logoGrad)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <defs><linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#06b6d4" /><stop offset="100%" stopColor="#8b5cf6" /></linearGradient></defs>
-            <path d="M1 3h15v13H1z" /><path d="M16 8h4l3 3v5h-7V8z" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" />
-          </svg>
-        </div>
-        {!collapsed && (
+      <div className="sidebar-logo" style={{ padding: collapsed ? '16px 20px' : '12px 20px', minHeight: 'var(--header-height)', display: 'flex', alignItems: 'center' }}>
+        {collapsed ? (
+          <span style={{ fontSize: '16px', fontWeight: '900', color: '#0284c7' }}>SAP</span>
+        ) : (
           <div className="logo-text-wrap">
-            <div className="logo-text">PT<span>.SAP</span></div>
-            <div className="logo-sub">Management System</div>
+            <div className="logo-text" style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a' }}>
+              PT <span style={{ color: '#0284c7' }}>SAP</span>
+            </div>
+            <div className="logo-sub" style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>Order & Maintenance</div>
           </div>
         )}
       </div>
 
       {/* Navigation */}
       <nav className="sidebar-nav">
-        {menuItems.map((group) => (
+        {filteredMenuItems.map((group) => (
           <div key={group.label} className="menu-group">
             {!collapsed && <div className="menu-label">{group.label}</div>}
             {group.items.map((item) => (

@@ -249,8 +249,8 @@ draft → pending → approved → in_progress → completed / cancelled
 // Android Emulator : http://10.0.2.2:5000/api
 // iOS Simulator   : http://localhost:5000/api
 // Real Device      : http://192.168.x.x:5000/api  ← IP komputer di Wi-Fi yang sama
-static const String baseUrl = 'http://192.168.6.160:5000/api';
-static const String imageUrl = 'http://192.168.6.160:5000';
+static const String baseUrl = 'http://192.168.6.158:5000/api';
+static const String imageUrl = 'http://192.168.6.158:5000';
 ```
 
 ### Layanan (`mobile/lib/services/`)

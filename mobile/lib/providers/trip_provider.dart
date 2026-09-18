@@ -30,6 +30,21 @@ class TripProvider with ChangeNotifier {
     }
   }
 
+  Future<void> fetchMyOrders(int requesterId) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      _trips = await _tripService.getTrips(requesterId: requesterId);
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> createOrder(Map<String, dynamic> data) async {
     _isLoading = true;
     _error = null;
@@ -37,6 +52,23 @@ class TripProvider with ChangeNotifier {
 
     try {
       await _tripService.createOrder(data);
+    } catch (e) {
+      _error = e.toString();
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> withdrawOrder(int tripId, int requesterId) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _tripService.withdrawOrder(tripId);
+      await fetchMyOrders(requesterId);
     } catch (e) {
       _error = e.toString();
       rethrow;

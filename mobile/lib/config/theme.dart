@@ -3,20 +3,39 @@ import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   // Colors matching the web app
-  static const Color primary = Color(0xFF1a94a8);
-  static const Color primaryDark = Color(0xFF0f3d47);
-  static const Color accent = Color(0xFF22b0c6);
-  static const Color background = Color(0xFFf8fafc);
+  static const Color primary = Color(0xFF3B82F6);      // Azure blue
+  static const Color primaryDark = Color(0xFF0F172A);  // Slate dark
+  static const Color accent = Color(0xFF6366F1);       // Indigo
+  static const Color background = Color(0xFFF1F5F9);   // Light gray-blue
   static const Color cardBg = Colors.white;
   
-  static const Color textPrimary = Color(0xFF1a2e35);
-  static const Color textSecondary = Color(0xFF4a6670);
-  static const Color textMuted = Color(0xFF8ba3ab);
+  static const Color textPrimary = Color(0xFF0F172A);
+  static const Color textSecondary = Color(0xFF475569);
+  static const Color textMuted = Color(0xFF94A3B8);
   
-  static const Color danger = Color(0xFFdc2626);
-  static const Color success = Color(0xFF059669);
-  static const Color warning = Color(0xFFd97706);
-  static const Color info = Color(0xFF0e8fa0);
+  static const Color danger = Color(0xFFEF4444);
+  static const Color success = Color(0xFF16A34A);
+  static const Color warning = Color(0xFFF59E0B);
+  static const Color info = Color(0xFF0EA5E9);
+
+  // Custom Gradients matching the web app
+  static const Gradient primaryGradient = LinearGradient(
+    colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const Gradient successGradient = LinearGradient(
+    colors: [Color(0xFF16A34A), Color(0xFF0EA5E9)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const Gradient warningGradient = LinearGradient(
+    colors: [Color(0xFFF59E0B), Color(0xFFEF4444)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 
   static ThemeData get lightTheme {
     return ThemeData(
@@ -30,12 +49,12 @@ class AppTheme {
         bodyMedium: const TextStyle(color: textSecondary),
       ),
       appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
-        iconTheme: IconThemeData(color: primaryDark),
+        iconTheme: IconThemeData(color: textPrimary),
         titleTextStyle: TextStyle(
-          color: primaryDark,
+          color: textPrimary,
           fontSize: 18,
           fontWeight: FontWeight.w700,
         ),
@@ -56,11 +75,11 @@ class AppTheme {
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFe2e8f0)),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFe2e8f0)),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -73,7 +92,7 @@ class AppTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: Color(0xFFf1f5f9)),
+          side: const BorderSide(color: Color(0xFFE2E8F0)),
         ),
       ),
       colorScheme: ColorScheme.fromSeed(seedColor: primary).copyWith(

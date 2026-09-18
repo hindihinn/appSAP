@@ -42,12 +42,18 @@ class _DriverTasksScreenState extends State<DriverTasksScreen> {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
+        backgroundColor: AppTheme.background,
         appBar: AppBar(
-          title: const Text('Tugas Perjalanan'),
+          title: const Text('Tugas Perjalanan', style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.5)),
           elevation: 0,
-          backgroundColor: AppTheme.primaryDark,
+          backgroundColor: Colors.white,
+          iconTheme: const IconThemeData(color: AppTheme.textPrimary),
           bottom: const TabBar(
-            indicatorColor: Colors.white,
+            indicatorColor: AppTheme.primary,
+            labelColor: AppTheme.primary,
+            unselectedLabelColor: AppTheme.textSecondary,
+            labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            unselectedLabelStyle: TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
             tabs: [
               Tab(text: 'Tugas Aktif'),
               Tab(text: 'Riwayat Selesai'),
@@ -90,89 +96,117 @@ class _DriverTasksScreenState extends State<DriverTasksScreen> {
         itemCount: trips.length,
         itemBuilder: (context, index) {
           final trip = trips[index];
-          return Card(
+          bool isInProgress = trip.status == 'in_progress';
+          Color accentColor = isInProgress ? AppTheme.info : AppTheme.warning;
+
+          return Container(
             margin: const EdgeInsets.only(bottom: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: isActive ? () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => ActiveTripStepperScreen(tripId: trip.id)),
-                ).then((_) => _loadTrips());
-              } : null,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border(
+                    left: BorderSide(
+                      color: accentColor,
+                      width: 5,
+                    ),
+                  ),
+                ),
+                child: InkWell(
+                  onTap: isActive ? () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => ActiveTripStepperScreen(tripId: trip.id)),
+                    ).then((_) => _loadTrips());
+                  } : null,
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          trip.orderNumber,
-                          style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: trip.status == 'in_progress' ? Colors.blue.shade100 : Colors.orange.shade100,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            trip.status.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: trip.status == 'in_progress' ? Colors.blue.shade800 : Colors.orange.shade800,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              trip.spdNumber ?? trip.orderNumber,
+                              style: const TextStyle(fontWeight: FontWeight.w800, color: AppTheme.primary, fontSize: 15),
                             ),
-                          ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: accentColor.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                trip.statusLabel,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: accentColor,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      trip.destination,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      trip.purpose,
-                      style: TextStyle(color: Colors.grey.shade600),
-                    ),
-                    const Divider(height: 24),
-                    Row(
-                      children: [
-                        const Icon(Icons.directions_car, size: 16, color: Colors.grey),
-                        const SizedBox(width: 8),
-                        Text(trip.nopol ?? '-'),
-                        const Spacer(),
-                        const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
-                        const SizedBox(width: 8),
+                        const SizedBox(height: 12),
                         Text(
-                          trip.plannedDeparture != null
-                              ? DateFormat('dd MMM yyyy').format(DateTime.parse(trip.plannedDeparture!))
-                              : '-',
+                          trip.destination,
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
                         ),
+                        const SizedBox(height: 4),
+                        Text(
+                          trip.purpose,
+                          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+                        ),
+                        const Divider(height: 28, color: Color(0xFFE2E8F0)),
+                        Row(
+                          children: [
+                            const Icon(Icons.local_shipping_outlined, size: 16, color: AppTheme.textMuted),
+                            const SizedBox(width: 8),
+                            Text(trip.nopol ?? '-', style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                            const Spacer(),
+                            const Icon(Icons.calendar_today_outlined, size: 16, color: AppTheme.textMuted),
+                            const SizedBox(width: 8),
+                            Text(
+                              trip.plannedDeparture != null
+                                  ? DateFormat('dd MMM yyyy').format(DateTime.parse(trip.plannedDeparture!))
+                                  : '-',
+                              style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                            ),
+                          ],
+                        ),
+                        if (isActive) ...[
+                          const SizedBox(height: 18),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 44,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => ActiveTripStepperScreen(tripId: trip.id)),
+                                ).then((_) => _loadTrips());
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.primary,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                elevation: 0,
+                              ),
+                              child: const Text('Mulai / Lanjutkan Tugas', style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                          )
+                        ]
                       ],
                     ),
-                    if (isActive) ...[
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => ActiveTripStepperScreen(tripId: trip.id)),
-                            ).then((_) => _loadTrips());
-                          },
-                          style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
-                          child: const Text('Mulai / Lanjutkan Tugas'),
-                        ),
-                      )
-                    ]
-                  ],
+                  ),
                 ),
               ),
             ),

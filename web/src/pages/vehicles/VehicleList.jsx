@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import api from '../../services/api';
+import api, { getImageUrl } from '../../services/api';
 import DataTable from '../../components/common/DataTable';
 import Modal from '../../components/common/Modal';
 import { HiOutlineIdentification, HiOutlineOfficeBuilding, HiOutlineViewGrid, HiOutlineTruck, HiOutlineTag, HiOutlineCube, HiOutlineCalendar, HiOutlineColorSwatch, HiOutlineScale, HiOutlineLightningBolt, HiOutlineLocationMarker, HiOutlineClipboardList, HiOutlineCamera, HiOutlinePhotograph, HiOutlineTrash, HiOutlineUpload, HiOutlinePencil, HiOutlineDocumentText, HiOutlineShieldCheck, HiOutlineCog, HiOutlineEye, HiOutlineX, HiOutlineChevronLeft, HiOutlineChevronRight, HiOutlineZoomIn } from 'react-icons/hi';
@@ -16,7 +16,7 @@ const PHOTO_FIELDS = [
 /* ── Reusable: Section Header ── */
 const SectionHeader = ({ icon: Icon, title, subtitle }) => (
   <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16, paddingBottom:10, borderBottom:'1px solid var(--border-color, #e2e8f0)' }}>
-    <div style={{ width:32, height:32, borderRadius:8, background:'linear-gradient(135deg, #1b7a8a, #1a94a8)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+    <div style={{ width:32, height:32, borderRadius:8, background:'var(--gradient-1)', display:'flex', alignItems:'center', justifyContent:'center' }}>
       <Icon size={16} color="#fff" />
     </div>
     <div>
@@ -49,7 +49,7 @@ const OWNERSHIP_MAP = { owned:'Milik Sendiri', rental:'Rental', leasing:'Leasing
 /* ── View Detail Row ── */
 const DetailRow = ({ icon: Icon, label, value }) => (
   <div style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 0', borderBottom:'1px solid #f1f5f9' }}>
-    <Icon size={15} style={{ color:'var(--accent, #1a94a8)', flexShrink:0 }} />
+    <Icon size={15} style={{ color:'var(--accent)', flexShrink:0 }} />
     <span style={{ fontSize:'0.78rem', color:'var(--text-muted, #8ba3ab)', width:120, flexShrink:0 }}>{label}</span>
     <span style={{ fontSize:'0.82rem', fontWeight:600, color:'var(--text-primary, #1a2e35)' }}>{value || '—'}</span>
   </div>
@@ -71,18 +71,24 @@ export default function VehicleList() {
   const [viewModal, setViewModal] = useState(false);
   const [viewPhotoIdx, setViewPhotoIdx] = useState(0);
   const [lightbox, setLightbox] = useState({ open: false, photos: [], idx: 0 });
+  const [fuelOptions, setFuelOptions] = useState([]);
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
   const fileRefs = useRef({});
 
   const load = async () => {
     setLoading(true);
-    const [vRes, uRes, cRes] = await Promise.all([
+    const [vRes, uRes, cRes, fRes] = await Promise.all([
       api.get('/vehicles', { params: { status: filterStatus || undefined } }),
       api.get('/organizations/units'),
       api.get('/organizations/companies'),
+      api.get('/fuels').catch(() => ({ data: { data: [] } })),
     ]);
     setVehicles(vRes.data.data);
     setUnits(uRes.data.data);
     setCompanies(cRes.data.data);
+    const fuelsList = fRes.data.data || [];
+    const distinctFuels = Array.from(new Set(fuelsList.map(f => f.name)));
+    setFuelOptions(distinctFuels);
     setLoading(false);
   };
 
@@ -102,22 +108,33 @@ export default function VehicleList() {
 
   const openAdd = () => { setForm(INIT); setEditing(null); setPhotoPreviews({}); setModal(true); };
 
-  const openView = (v) => {
-    setViewData(v);
-    setViewPhotoIdx(0);
-    setViewModal(true);
+  const openView = async (v) => {
+    try {
+      const res = await api.get(`/vehicles/${v.id}`);
+      setViewData(res.data.data);
+      setViewPhotoIdx(0);
+      setViewModal(true);
+    } catch (err) {
+      alert('Gagal memuat detail kendaraan');
+    }
   };
 
-  const openEdit = (v) => {
-    const vehicleUnit = units.find(u => u.id === v.unit_id);
-    const companyId = vehicleUnit ? vehicleUnit.company_id : (v.company_id || '');
-    setForm({ ...v, unit_id: v.unit_id || '', company_id: String(companyId || '') });
-    setEditing(v.id);
-    const previews = {};
-    const apiBase = api.defaults.baseURL?.replace('/api', '') || 'http://localhost:5000';
-    PHOTO_FIELDS.forEach(pf => { if (v[pf.key]) previews[pf.key] = `${apiBase}${v[pf.key]}`; });
-    setPhotoPreviews(previews);
-    setModal(true);
+  const openEdit = async (v) => {
+    try {
+      const res = await api.get(`/vehicles/${v.id}`);
+      const fullV = res.data.data;
+      const vehicleUnit = units.find(u => u.id === fullV.unit_id);
+      const companyId = vehicleUnit ? vehicleUnit.company_id : (fullV.company_id || '');
+      setForm({ ...fullV, unit_id: fullV.unit_id || '', company_id: String(companyId || '') });
+      setEditing(fullV.id);
+      const previews = {};
+
+      PHOTO_FIELDS.forEach(pf => { if (fullV[pf.key]) previews[pf.key] = getImageUrl(fullV[pf.key]); });
+      setPhotoPreviews(previews);
+      setModal(true);
+    } catch (err) {
+      alert('Gagal memuat data edit kendaraan');
+    }
   };
 
   const handleSave = async (e) => {
@@ -138,6 +155,15 @@ export default function VehicleList() {
   };
 
   const handleDelete = async (id) => { if (!confirm('Hapus kendaraan ini?')) return; await api.delete(`/vehicles/${id}`); load(); };
+  const handleDeactivate = async (id) => {
+    if (!confirm('Nonaktifkan kendaraan ini?')) return;
+    try {
+      await api.put(`/vehicles/${id}/status`, { status: 'inactive' });
+      load();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Gagal menonaktifkan kendaraan');
+    }
+  };
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const handlePhotoChange = (key, file) => {
@@ -170,28 +196,342 @@ export default function VehicleList() {
 
   return (
     <div>
-      <div className="page-header">
-        <div><h1 className="page-title">Unit Kendaraan</h1><p className="page-subtitle">Kelola data unit kendaraan operasional</p></div>
-        <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-          <select className="form-select" style={{ width:160 }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-            <option value="">Semua Status</option>
-            <option value="available">Tersedia</option>
-            <option value="in_use">Digunakan</option>
-            <option value="maintenance">Maintenance</option>
-            <option value="inactive">Nonaktif</option>
-          </select>
+      {/* ══ HERO HEADER BANNER (DINAS THEME STYLED) ══ */}
+      <div style={{
+        background: 'var(--gradient-vehicles)',
+        borderRadius: 20, 
+        padding: '28px 32px', 
+        marginBottom: 28,
+        position: 'relative', 
+        overflow: 'hidden',
+        boxShadow: 'var(--shadow-lg)',
+      }}>
+        {/* Background decorative translucent circles */}
+        <div style={{ position: 'absolute', top: -50, right: -50, width: 220, height: 220, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: -70, left: '38%', width: 260, height: 260, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', pointerEvents: 'none' }} />
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16, position: 'relative' }}>
+          {/* Title & Icon Section */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{
+              width: 50, 
+              height: 50, 
+              borderRadius: 14,
+              background: 'rgba(255,255,255,0.15)', 
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255,255,255,0.25)',
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+            }}>
+              <HiOutlineTruck size={24} style={{ color: '#fff' }} />
+            </div>
+            <div>
+              <h1 style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: 0, letterSpacing: '-0.5px' }}>
+                Unit Kendaraan
+              </h1>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', margin: '4px 0 0' }}>
+                Kelola data unit kendaraan operasional, status jalan, dan spesifikasi armada secara real-time
+              </p>
+            </div>
+          </div>
+
+          {/* Action Area & Buttons */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            {/* View Mode Toggle */}
+            <div style={{ 
+              display: 'flex', 
+              background: 'rgba(255,255,255,0.12)', 
+              borderRadius: 10, 
+              padding: 3, 
+              border: '1px solid rgba(255,255,255,0.15)',
+              backdropFilter: 'blur(10px)'
+            }}>
+              <button 
+                onClick={() => setViewMode('grid')} 
+                style={{
+                  background: viewMode === 'grid' ? '#fff' : 'transparent',
+                  color: viewMode === 'grid' ? 'var(--text-primary)' : '#fff',
+                  border: 'none', borderRadius: 7, padding: '6px 12px',
+                  fontSize: 12, fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s'
+                }}
+              >
+                Grid
+              </button>
+              <button 
+                onClick={() => setViewMode('list')} 
+                style={{
+                  background: viewMode === 'list' ? '#fff' : 'transparent',
+                  color: viewMode === 'list' ? 'var(--text-primary)' : '#fff',
+                  border: 'none', borderRadius: 7, padding: '6px 12px',
+                  fontSize: 12, fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s'
+                }}
+              >
+                Table
+              </button>
+            </div>
+
+            {/* Status Select Filter inside header */}
+            <select 
+              className="form-select" 
+              style={{ 
+                width: 160, 
+                background: 'rgba(255,255,255,0.12)', 
+                color: '#fff', 
+                border: '1px solid rgba(255,255,255,0.25)', 
+                borderRadius: 10,
+                fontSize: 13,
+                fontWeight: 600,
+                padding: '7px 12px',
+                outline: 'none',
+                cursor: 'pointer'
+              }} 
+              value={filterStatus} 
+              onChange={e => setFilterStatus(e.target.value)}
+            >
+              <option value="" style={{ color: 'var(--text-primary)' }}>Semua Status</option>
+              <option value="available" style={{ color: 'var(--text-primary)' }}>Tersedia</option>
+              <option value="in_use" style={{ color: 'var(--text-primary)' }}>Digunakan</option>
+              <option value="maintenance" style={{ color: 'var(--text-primary)' }}>Maintenance</option>
+              <option value="inactive" style={{ color: 'var(--text-primary)' }}>Nonaktif</option>
+            </select>
+
+            {/* Create Button */}
+            <button onClick={openAdd} style={{
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 8,
+              background: 'rgba(255,255,255,0.2)', 
+              border: '1px solid rgba(255,255,255,0.3)',
+              color: '#fff', 
+              padding: '9px 18px', 
+              borderRadius: 10, 
+              cursor: 'pointer',
+              fontSize: 13, 
+              fontWeight: 600, 
+              backdropFilter: 'blur(10px)', 
+              transition: 'all 0.2s',
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+            >
+              + Tambah Unit
+            </button>
+
+            {/* Refresh Button */}
+            <button onClick={load} style={{
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 8,
+              background: 'rgba(255,255,255,0.15)', 
+              border: '1px solid rgba(255,255,255,0.25)',
+              color: '#fff', 
+              padding: '9px 18px', 
+              borderRadius: 10, 
+              cursor: 'pointer',
+              fontSize: 13, 
+              fontWeight: 600, 
+              backdropFilter: 'blur(10px)', 
+              transition: 'all 0.2s',
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+            >
+              <HiOutlineClipboardList size={14} />
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        {/* Translucent Glassmorphic Metric Cards Row */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginTop: 22 }}>
+          {[
+            { label: 'Total Kendaraan', val: vehicles.length, icon: <HiOutlineTruck size={20} /> },
+            { label: 'Tersedia', val: vehicles.filter(v => v.status === 'available').length, icon: <HiOutlineShieldCheck size={20} /> },
+            { label: 'Sedang Dinas', val: vehicles.filter(v => v.status === 'in_use').length, icon: <HiOutlineLocationMarker size={20} /> },
+            { label: 'Maintenance', val: vehicles.filter(v => v.status === 'maintenance').length, icon: <HiOutlineCog size={20} /> },
+          ].map((s, i) => (
+            <div key={i} style={{
+              background: 'rgba(255,255,255,0.12)', 
+              border: '1px solid rgba(255,255,255,0.15)',
+              borderRadius: 12, 
+              padding: '14px 16px', 
+              backdropFilter: 'blur(10px)',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ display: 'flex', alignItems: 'center', color: '#fff' }}>{s.icon}</span>
+                <span style={{ fontSize: 24, fontWeight: 800, color: '#fff' }}>{s.val}</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: 500 }}>{s.label}</div>
+            </div>
+          ))}
         </div>
       </div>
 
-      <DataTable columns={columns} data={vehicles} loading={loading} onAdd={openAdd} addLabel="Tambah Kendaraan"
-        actions={(row) => (
-          <div style={{ display:'flex', gap:4 }}>
-            <button className="btn btn-ghost btn-sm" title="Lihat Detail" onClick={() => openView(row)} style={{ color:'var(--accent, #1a94a8)' }}><HiOutlineEye size={16}/></button>
-            <button className="btn btn-ghost btn-sm" title="Edit" onClick={() => openEdit(row)}><HiOutlinePencil size={15}/></button>
-            <button className="btn btn-ghost btn-sm" title="Hapus" onClick={() => handleDelete(row.id)}><HiOutlineTrash size={15}/></button>
-          </div>
-        )}
-      />
+      {loading ? (
+        <div className="loading"><div className="spinner" /></div>
+      ) : viewMode === 'list' ? (
+        <DataTable columns={columns} data={vehicles} loading={loading} onAdd={openAdd} addLabel="Tambah Kendaraan"
+          actions={(row) => (
+            <div style={{ display:'flex', gap:4 }}>
+              <button className="btn btn-ghost btn-sm" title="Lihat Detail" onClick={() => openView(row)} style={{ color:'var(--accent)' }}><HiOutlineEye size={16}/></button>
+              <button className="btn btn-ghost btn-sm" title="Edit" onClick={() => openEdit(row)}><HiOutlinePencil size={15}/></button>
+              {row.has_transactions ? (
+                <button 
+                  className="btn btn-ghost btn-sm" 
+                  title={row.status === 'inactive' ? "Sudah Nonaktif" : "Nonaktifkan"} 
+                  onClick={() => handleDeactivate(row.id)} 
+                  disabled={row.status === 'inactive'}
+                  style={{ color: row.status === 'inactive' ? 'var(--text-muted, #8ba3ab)' : 'var(--warning, #d97706)' }}
+                >
+                  <HiOutlineX size={15}/>
+                </button>
+              ) : (
+                <button className="btn btn-ghost btn-sm" title="Hapus" onClick={() => handleDelete(row.id)}><HiOutlineTrash size={15}/></button>
+              )}
+            </div>
+          )}
+        />
+      ) : (
+        /* Grid View */
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+          {vehicles.length === 0 ? (
+            <div style={{ gridColumn: 'span 3', padding: 40, textAlign: 'center', background: '#fff', border: '1px solid var(--border)', borderRadius: 16, color: 'var(--text-muted)' }}>
+              Tidak ada kendaraan terdaftar.
+            </div>
+          ) : (
+            vehicles.map((v) => {
+              const status = STATUS_MAP[v.status] || { label: v.status, color: 'var(--text-muted)', bg: 'rgba(0,0,0,0.05)' };
+
+              return (
+                <div key={v.id} style={{
+                  background: '#fff',
+                  border: '1px solid var(--border)',
+                  borderRadius: 16,
+                  overflow: 'hidden',
+                  boxShadow: 'var(--shadow)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  transition: 'transform 0.2s',
+                }}
+                  onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+                  onMouseLeave={e => e.currentTarget.style.transform = 'none'}
+                >
+                  {/* Photo Section */}
+                  <div style={{ height: 140, background: 'var(--bg-primary)', position: 'relative', overflow: 'hidden' }}>
+                    {v.photo_front ? (
+                      <img src={getImageUrl(v.photo_front)} alt={v.nopol} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                        <HiOutlineTruck size={40} style={{ opacity: 0.3 }} />
+                      </div>
+                    )}
+                    {/* Status Pill on Photo */}
+                    <span style={{
+                      position: 'absolute', top: 12, right: 12,
+                      fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 20,
+                      background: status.bg === 'rgba(0,0,0,0.05)' ? '#fff' : status.bg, 
+                      color: status.color, border: `1px solid ${status.color}30`,
+                      backdropFilter: 'blur(4px)'
+                    }}>
+                      {status.label}
+                    </span>
+                  </div>
+
+                  {/* Body Content */}
+                  <div style={{ padding: 18, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    <div>
+                      {/* Nopol & Code */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <span style={{ fontWeight: 800, fontSize: 16, color: 'var(--text-primary)' }}>{v.nopol}</span>
+                        <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-muted)' }}>{v.vehicle_code || '—'}</span>
+                      </div>
+
+                      {/* Merk, Model, Year */}
+                      <h4 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-secondary)', margin: '0 0 10px 0' }}>
+                        {v.merk} {v.model || ''} <span style={{ fontWeight: 400, fontSize: 12, color: 'var(--text-muted)' }}>({v.year || '—'})</span>
+                      </h4>
+
+                      {/* Owner PT & Unit */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 14, fontSize: 12 }}>
+                        <div style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <HiOutlineOfficeBuilding size={14} style={{ color: 'var(--accent)', opacity: 0.8 }} />
+                          <span>{v.company_name || '—'}</span>
+                        </div>
+                        <div style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 4 }}>
+                          <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--text-muted)' }} />
+                          <span>{v.unit_name || '—'}</span>
+                        </div>
+                      </div>
+
+                      {/* Specs Row */}
+                      <div style={{
+                        display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8,
+                        background: 'var(--bg-primary)', padding: '10px 12px', borderRadius: 10, marginBottom: 14
+                      }}>
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Kilometer</div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', marginTop: 2 }}>
+                            {v.current_km ? `${Math.round(v.current_km/1000)}k` : '0'} <span style={{ fontSize: 9, fontWeight: 500 }}>km</span>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'center', borderLeft: '1px solid var(--border)', borderRight: '1px solid var(--border)' }}>
+                          <div style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Kapasitas</div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', marginTop: 2 }}>
+                            {v.capacity_ton || '—'} <span style={{ fontSize: 9, fontWeight: 500 }}>ton</span>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Bahan Bakar</div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', marginTop: 2, textTransform: 'capitalize' }}>
+                            {v.fuel_type || '—'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Actions Row */}
+                    <div style={{
+                      display: 'flex', gap: 6, paddingTop: 12,
+                      borderTop: '1px solid var(--border)', justifyContent: 'flex-end'
+                    }}>
+                      <button className="btn btn-ghost btn-sm" title="Lihat Detail" onClick={() => openView(v)} style={{ color:'var(--accent)', padding: '6px 12px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <HiOutlineEye size={13}/> Detail
+                      </button>
+                      <button className="btn btn-ghost btn-sm" title="Edit" onClick={() => openEdit(v)} style={{ padding: '6px 12px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <HiOutlinePencil size={12}/> Edit
+                      </button>
+                      {v.has_transactions ? (
+                        <button 
+                          className="btn btn-ghost btn-sm" 
+                          title={v.status === 'inactive' ? "Sudah Nonaktif" : "Nonaktifkan"} 
+                          onClick={() => handleDeactivate(v.id)} 
+                          disabled={v.status === 'inactive'}
+                          style={{ 
+                            color: v.status === 'inactive' ? 'var(--text-muted, #8ba3ab)' : 'var(--warning, #d97706)', 
+                            padding: '6px 12px', 
+                            fontSize: 11, 
+                            display: 'inline-flex', 
+                            alignItems: 'center', 
+                            gap: 4 
+                          }}
+                        >
+                          <HiOutlineX size={12}/> Nonaktif
+                        </button>
+                      ) : (
+                        <button className="btn btn-ghost btn-sm" title="Hapus" onClick={() => handleDelete(v.id)} style={{ color:'var(--danger)', padding: '6px 12px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <HiOutlineTrash size={12}/> Hapus
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
 
       <Modal isOpen={modal} onClose={() => setModal(false)} title={editing ? 'Edit Kendaraan' : 'Tambah Kendaraan'} size="xl"
         footer={<>
@@ -200,8 +540,8 @@ export default function VehicleList() {
         </>}>
         <form onSubmit={handleSave}>
 
-          {/* ═══ Section 1: Identitas & Organisasi ═══ */}
-          <SectionHeader icon={HiOutlineIdentification} title="Identitas & Organisasi" subtitle="Kode kendaraan, perusahaan dan unit" />
+          {/* ═══ Section 1: Identitas & Company ═══ */}
+          <SectionHeader icon={HiOutlineIdentification} title="Identitas & Company" subtitle="Kode kendaraan, perusahaan dan unit" />
           <div style={g3}>
             <IconField icon={HiOutlineTag} label="Kode Kendaraan">
               <input className="form-input" placeholder="VHC-001" value={form.vehicle_code} onChange={e => set('vehicle_code', e.target.value)} />
@@ -259,7 +599,11 @@ export default function VehicleList() {
               </IconField>
               <IconField icon={HiOutlineLightningBolt} label="Bahan Bakar">
                 <select className="form-select" value={form.fuel_type} onChange={e => set('fuel_type', e.target.value)}>
-                  {['solar','pertalite','pertamax','dex'].map(f => <option key={f} value={f}>{f.charAt(0).toUpperCase()+f.slice(1)}</option>)}
+                  <option value="">— Pilih Bahan Bakar —</option>
+                  {fuelOptions.map(f => <option key={f} value={f}>{f}</option>)}
+                  {fuelOptions.length === 0 && ['solar','pertalite','pertamax','dex'].map(f => (
+                    <option key={f} value={f}>{f.charAt(0).toUpperCase()+f.slice(1)}</option>
+                  ))}
                 </select>
               </IconField>
               <IconField icon={HiOutlineLocationMarker} label="KM Saat Ini">
@@ -296,12 +640,12 @@ export default function VehicleList() {
                   className="vehicle-photo-card"
                   onClick={() => !photoPreviews[pf.key] && fileRefs.current[pf.key]?.click()}
                   style={{
-                    border: photoPreviews[pf.key] ? '2px solid var(--accent, #1a94a8)' : '2px dashed #cbd5e1',
+                    border: photoPreviews[pf.key] ? '2px solid var(--accent)' : '2px dashed #cbd5e1',
                     borderRadius:12, overflow:'hidden', cursor:'pointer', transition:'all 0.25s ease',
-                    background: photoPreviews[pf.key] ? '#f0fdfa' : '#f8fafc',
+                    background: photoPreviews[pf.key] ? '#eff6ff' : '#f8fafc',
                     position:'relative',
                   }}
-                  onMouseEnter={e => { if (!photoPreviews[pf.key]) { e.currentTarget.style.borderColor='var(--accent, #1a94a8)'; e.currentTarget.style.background='#f0fdfa'; e.currentTarget.style.transform='translateY(-2px)'; } }}
+                  onMouseEnter={e => { if (!photoPreviews[pf.key]) { e.currentTarget.style.borderColor='var(--accent)'; e.currentTarget.style.background='#eff6ff'; e.currentTarget.style.transform='translateY(-2px)'; } }}
                   onMouseLeave={e => { if (!photoPreviews[pf.key]) { e.currentTarget.style.borderColor='#cbd5e1'; e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.transform='none'; } }}
                 >
                   {photoPreviews[pf.key] ? (
@@ -325,8 +669,8 @@ export default function VehicleList() {
                     </div>
                   ) : (
                     <div style={{ padding:'24px 12px', textAlign:'center', display:'flex', flexDirection:'column', alignItems:'center', gap:6 }}>
-                      <div style={{ width:44, height:44, borderRadius:12, background:'linear-gradient(135deg, rgba(26,148,168,0.08), rgba(26,148,168,0.15))', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                        <HiOutlineUpload size={20} style={{ color:'var(--accent, #1a94a8)' }} />
+                      <div style={{ width:44, height:44, borderRadius:12, background:'linear-gradient(135deg, rgba(59,130,246,0.08), rgba(59,130,246,0.15))', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                        <HiOutlineUpload size={20} style={{ color:'var(--accent)' }} />
                       </div>
                       <div style={{ fontSize:'0.78rem', fontWeight:700, color:'var(--text-primary, #1a2e35)' }}>{pf.desc}</div>
                       <div style={{ fontSize:'0.68rem', color:'var(--text-muted, #8ba3ab)', lineHeight:1.3 }}>Klik untuk upload<br/>JPG, PNG maks 10MB</div>
@@ -355,13 +699,13 @@ export default function VehicleList() {
           <button className="btn btn-primary" onClick={() => { setViewModal(false); if(viewData) openEdit(viewData); }}><HiOutlinePencil size={14} style={{marginRight:4}}/> Edit Kendaraan</button>
         </>}>
         {viewData && (() => {
-          const apiBase = api.defaults.baseURL?.replace('/api', '') || 'http://localhost:5000';
-          const photos = PHOTO_FIELDS.map(pf => ({ ...pf, url: viewData[pf.key] ? `${apiBase}${viewData[pf.key]}` : null })).filter(p => p.url);
+
+          const photos = PHOTO_FIELDS.map(pf => ({ ...pf, url: viewData[pf.key] ? getImageUrl(viewData[pf.key]) : null })).filter(p => p.url);
           const st = STATUS_MAP[viewData.status] || STATUS_MAP.available;
           return (
             <div>
               {/* Header card */}
-              <div style={{ background:'linear-gradient(135deg, #0f3d47, #1a6b7a)', borderRadius:14, padding:'20px 24px', marginBottom:20, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <div style={{ background:'var(--gradient-1)', borderRadius:14, padding:'20px 24px', marginBottom:20, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
                 <div style={{ display:'flex', alignItems:'center', gap:16 }}>
                   <div style={{ width:52, height:52, borderRadius:14, background:'rgba(255,255,255,0.15)', display:'flex', alignItems:'center', justifyContent:'center' }}>
                     <HiOutlineTruck size={26} color="#fff" />
@@ -395,7 +739,7 @@ export default function VehicleList() {
                   <div style={{ display:'flex', gap:8 }}>
                     {photos.map((p, i) => (
                       <div key={p.key} onClick={() => { setViewPhotoIdx(i); }}
-                        style={{ width:72, height:52, borderRadius:8, overflow:'hidden', cursor:'pointer', border: i===viewPhotoIdx ? '2px solid var(--accent, #1a94a8)' : '2px solid transparent', opacity: i===viewPhotoIdx ? 1 : 0.6, transition:'all 0.2s ease' }}
+                        style={{ width:72, height:52, borderRadius:8, overflow:'hidden', cursor:'pointer', border: i===viewPhotoIdx ? '2px solid var(--accent)' : '2px solid transparent', opacity: i===viewPhotoIdx ? 1 : 0.6, transition:'all 0.2s ease' }}
                         onMouseEnter={e => e.currentTarget.style.opacity='1'}
                         onMouseLeave={e => { if(i!==viewPhotoIdx) e.currentTarget.style.opacity='0.6'; }}>
                         <img src={p.url} alt={p.desc} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
@@ -409,7 +753,7 @@ export default function VehicleList() {
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20 }}>
                 <div style={{ background:'#f8fafc', borderRadius:12, padding:16, border:'1px solid #f1f5f9' }}>
                   <div style={{ fontSize:'0.82rem', fontWeight:700, color:'var(--text-primary)', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>
-                    <HiOutlineIdentification size={15} style={{ color:'var(--accent)' }}/> Identitas & Organisasi
+                    <HiOutlineIdentification size={15} style={{ color:'var(--accent)' }}/> Identitas & Company
                   </div>
                   <DetailRow icon={HiOutlineTag} label="Kode" value={viewData.vehicle_code} />
                   <DetailRow icon={HiOutlineClipboardList} label="No. Polisi" value={viewData.nopol} />

@@ -3,6 +3,7 @@ import api from '../../services/api';
 import DataTable from '../../components/common/DataTable';
 import Modal from '../../components/common/Modal';
 import StatusBadge from '../../components/common/StatusBadge';
+import { FaExclamationTriangle, FaMobileAlt, FaUserCheck, FaUsers, FaSync, FaWarehouse } from 'react-icons/fa';
 
 export default function UserMobile() {
   const [users, setUsers] = useState([]);
@@ -13,7 +14,7 @@ export default function UserMobile() {
   const [modal, setModal] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [form, setForm] = useState({
-    name: '', email: '', password: '', phone: '', role_id: '',
+    name: '', username: '', password: '', phone: '', role_id: '',
     company_id: '', unit_id: '', is_active: 1
   });
   const [selectedDriverId, setSelectedDriverId] = useState('');
@@ -24,12 +25,12 @@ export default function UserMobile() {
       const [uRes, oRes, dRes, rRes] = await Promise.all([
         api.get('/users?type=mobile'),
         api.get('/organizations/companies'),
-        api.get('/drivers'),
+        api.get('/drivers?exclude_photos=true'),
         api.get('/roles')
       ]);
-      setUsers(uRes.data.data);
+      setUsers(uRes.data.data || []);
       setDrivers(dRes.data.data || []);
-      setOrgs(prev => ({ ...prev, companies: oRes.data.data }));
+      setOrgs(prev => ({ ...prev, companies: oRes.data.data || [] }));
       const allRoles = rRes.data.data || [];
       const mobRoles = allRoles.filter(r => r.platform === 'mobile');
       setMobileRoles(mobRoles);
@@ -93,11 +94,18 @@ export default function UserMobile() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const payload = {
+      ...form,
+      company_id: form.company_id === '' || form.company_id === null ? null : Number(form.company_id),
+      unit_id: form.unit_id === '' || form.unit_id === null ? null : Number(form.unit_id),
+      role_id: form.role_id === '' ? null : Number(form.role_id),
+      is_active: Number(form.is_active)
+    };
     try {
       if (modal.id) {
-        await api.put(`/users/${modal.id}`, form);
+        await api.put(`/users/${modal.id}`, payload);
       } else {
-        await api.post('/users', form);
+        await api.post('/users', payload);
       }
       setModal(null);
       loadData();
@@ -118,13 +126,12 @@ export default function UserMobile() {
 
   const columns = [
     { label: 'Nama', key: 'name' },
-    { label: 'Email Login', key: 'email' },
+    { label: 'Username Login', key: 'username' },
     { label: 'Role', key: 'role_id', render: (v, row) => {
       const role = mobileRoles.find(r => r.id === v) || { display_name: row.role_name || `Role #${v}` };
       return <span className="badge badge-purple">{role.display_name}</span>;
     }},
-
-    { label: 'Unit/Cabang', key: 'unit_name', render: (v, row) => <span>{row.unit_name || row.company_name || '-'}</span> },
+    { label: 'Unit/Gudang', key: 'unit_name', render: (v, row) => <span>{row.unit_name || row.company_name || '-'}</span> },
     { label: 'Status Akun', key: 'is_active', render: (v, row) => <StatusBadge status={row.is_active ? 'active' : 'inactive'} /> },
     { label: 'Aplikasi Terakhir', key: 'last_login', render: (v, row) => <span>{row.last_login ? new Date(row.last_login).toLocaleString('id-ID') : 'Belum Login'}</span> },
     {
@@ -148,19 +155,117 @@ export default function UserMobile() {
   const selectedRole = mobileRoles.find(r => String(r.id) === String(form.role_id));
   const isDriver = selectedRole ? selectedRole.name.toLowerCase().includes('driver') : false;
 
+  // Calculate metrics
+  const totalCount = users.length;
+  const driverCount = users.filter(u => u.role_name?.toLowerCase().includes('driver')).length;
+  const staffCount = totalCount - driverCount;
+
   return (
     <div>
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Manajemen Pengguna Mobile</h1>
-          <p className="page-subtitle">Kelola akun login untuk aplikasi mobile (Driver & Staff Gudang)</p>
+      {/* ══ HERO HEADER BANNER (USER MOBILE - SETTINGS THEME) ══ */}
+      <div style={{
+        background: 'var(--gradient-settings)',
+        borderRadius: 20, 
+        padding: '28px 32px', 
+        marginBottom: 28,
+        position: 'relative', 
+        overflow: 'hidden',
+        boxShadow: 'var(--shadow-lg)',
+      }}>
+        {/* Background decorative translucent circles */}
+        <div style={{ position: 'absolute', top: -50, right: -50, width: 220, height: 220, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: -70, left: '38%', width: 260, height: 260, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', pointerEvents: 'none' }} />
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16, position: 'relative' }}>
+          {/* Title & Icon Section */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{
+              width: 50, 
+              height: 50, 
+              borderRadius: 14,
+              background: 'rgba(255,255,255,0.15)', 
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255,255,255,0.25)',
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+            }}>
+              <FaMobileAlt size={22} style={{ color: '#fff' }} />
+            </div>
+            <div>
+              <h1 style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: 0, letterSpacing: '-0.5px' }}>
+                Pengguna Aplikasi Mobile
+              </h1>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', margin: '4px 0 0' }}>
+                Kelola kredensial login dan status aktif untuk driver dan staff gudang lapangan
+              </p>
+            </div>
+          </div>
+
+          {/* Action Area & Buttons */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <button className="btn btn-primary" onClick={() => {
+              setModal({});
+              setSelectedDriverId('');
+              setForm({ name: '', username: '', password: '', phone: '', role_id: mobileRoles[0]?.id || '', company_id: '', unit_id: '', is_active: 1 });
+              setOrgs(prev => ({ ...prev, units: [] }));
+            }} style={{
+              background: 'rgba(255,255,255,0.2)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              color: '#fff',
+              backdropFilter: 'blur(10px)',
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+            >
+              + Tambah Akses Mobile
+            </button>
+            <button onClick={loadData} style={{
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 8,
+              background: 'rgba(255,255,255,0.15)', 
+              border: '1px solid rgba(255,255,255,0.25)',
+              color: '#fff', 
+              padding: '9px 18px', 
+              borderRadius: 10, 
+              cursor: 'pointer',
+              fontSize: 13, 
+              fontWeight: 600, 
+              backdropFilter: 'blur(10px)', 
+              transition: 'all 0.2s',
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+            >
+              <FaSync size={12} />
+              Refresh
+            </button>
+          </div>
         </div>
-        <button className="btn btn-primary" onClick={() => {
-          setModal({});
-          setSelectedDriverId('');
-          setForm({ name: '', email: '', password: '', phone: '', role_id: mobileRoles[0]?.id || '', company_id: '', unit_id: '', is_active: 1 });
-          setOrgs(prev => ({ ...prev, units: [] }));
-        }}>+ Tambah Akses Mobile</button>
+
+        {/* Translucent Glassmorphic Metric Cards Row */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginTop: 22 }}>
+          {[
+            { label: 'Total User Mobile', val: totalCount, icon: <FaUsers size={20} /> },
+            { label: 'Kategori Driver', val: driverCount, icon: <FaUserCheck size={20} /> },
+            { label: 'Kategori Gudang / Staff', val: staffCount, icon: <FaWarehouse size={18} /> },
+          ].map((s, i) => (
+            <div key={i} style={{
+              background: 'rgba(255,255,255,0.12)', 
+              border: '1px solid rgba(255,255,255,0.15)',
+              borderRadius: 12, 
+              padding: '14px 16px', 
+              backdropFilter: 'blur(10px)',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ display: 'flex', alignItems: 'center', color: '#fff' }}>{s.icon}</span>
+                <span style={{ fontSize: 20, fontWeight: 800, color: '#fff' }}>{s.val}</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: 500 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="card">
@@ -228,12 +333,12 @@ export default function UserMobile() {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Email Login</label>
+            <label className="form-label">Username Login</label>
             <input
               className="form-input"
-              type="email"
-              value={form.email}
-              onChange={e => setForm({ ...form, email: e.target.value })}
+              type="text"
+              value={form.username}
+              onChange={e => setForm({ ...form, username: e.target.value })}
               required
             />
           </div>
@@ -283,7 +388,7 @@ export default function UserMobile() {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Unit / Cabang</label>
+            <label className="form-label">Unit / Gudang</label>
             {isDriver && !!selectedDriverId && !modal?.id ? (
               // Read-only display when driver is selected
               <input
@@ -332,7 +437,7 @@ export default function UserMobile() {
         }
       >
         <div style={{ textAlign: 'center', padding: '16px 0' }}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>⚠️</div>
+          <div style={{ marginBottom: 12, color: 'var(--warning)' }}><FaExclamationTriangle size={44} /></div>
           <p style={{ fontSize: 15, fontWeight: 600, marginBottom: 8, color: 'var(--text-primary)' }}>
             Hapus akses mobile <strong>"{deleteConfirm?.name}"</strong>?
           </p>

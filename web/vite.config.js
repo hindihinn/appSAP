@@ -10,6 +10,27 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       host: true,
+      strictPort: true,
+      watch: {
+        usePolling: true,
+        pollInterval: 300,
+        ignored: ['**/node_modules/**', '**/.git/**'],
+      },
+      proxy: {
+        '/api': {
+          target: apiTarget,
+          changeOrigin: true
+        },
+        '/uploads': {
+          target: apiTarget,
+          changeOrigin: true
+        }
+      }
+    },
+    preview: {
+      port: 1300,
+      host: true,
+      strictPort: true,
       proxy: {
         '/api': {
           target: apiTarget,
@@ -23,4 +44,5 @@ export default defineConfig(({ mode }) => {
     }
   }
 })
+
 

@@ -27,7 +27,7 @@ class AppDrawer extends StatelessWidget {
             ),
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [AppTheme.primaryDark, AppTheme.primary],
+                colors: [AppTheme.primaryDark, Color(0xFF1E3A8A), AppTheme.primary],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -115,7 +115,7 @@ class AppDrawer extends StatelessWidget {
                   const SizedBox(height: 16),
                   _buildSectionHeader('Operasional Gudang'),
                   _buildMenuItem(context, icon: Icons.add_box_rounded, title: 'Buat Order Dinas', route: AppRoutes.createOrder),
-                  _buildMenuItem(context, icon: Icons.list_alt_rounded, title: 'History Order', route: null),
+                  _buildMenuItem(context, icon: Icons.list_alt_rounded, title: 'History Order', route: AppRoutes.orderHistory),
                 ],
 
                 if (user?.roleId == 5) ...[
@@ -123,6 +123,10 @@ class AppDrawer extends StatelessWidget {
                   _buildSectionHeader('Tugas Driver'),
                   _buildMenuItem(context, icon: Icons.local_shipping_rounded, title: 'Tugas Perjalanan', route: AppRoutes.driverTasks),
                   _buildMenuItem(context, icon: Icons.history_rounded, title: 'History Perjalanan', route: null),
+                  const SizedBox(height: 16),
+                  _buildSectionHeader('Pemeliharaan Kendaraan'),
+                  _buildMenuItem(context, icon: Icons.report_problem_rounded, title: 'Laporkan Kerusakan', route: AppRoutes.reportDamage),
+                  _buildMenuItem(context, icon: Icons.build_circle_rounded, title: 'Tugas Perbaikan', route: AppRoutes.driverWOTasks),
                 ],
               ],
             ),
