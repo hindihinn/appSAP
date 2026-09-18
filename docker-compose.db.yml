@@ -1,22 +1,41 @@
 services:
+  db:
+    image: mysql:8.0
+    container_name: appsap-db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-Itsapcpka25}
+      MYSQL_DATABASE: ${DB_NAME:-fleet_management}
+    ports:
+      - "${DB_PORT:-3310}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./fleet_management.sql:/docker-entrypoint-initdb.d/fleet_management.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD:-Itsapcpka25}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   api:
     build: ./api
     container_name: appsap-api
     restart: always
     environment:
-      - DB_HOST=${DB_HOST:-host.docker.internal}
+      - DB_HOST=db
       - DB_USER=${DB_USER:-root}
       - DB_PASSWORD=${DB_PASSWORD:-Itsapcpka25}
       - DB_NAME=${DB_NAME:-fleet_management}
-      - DB_PORT=${DB_PORT:-3310}
+      - DB_PORT=3306
       - JWT_SECRET=${JWT_SECRET:-fleet_management_secret_key_2026_sap}
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
       - PORT=5000
       - UPLOAD_DIR=./uploads
     ports:
       - "${API_PORT:-1200}:5000"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    depends_on:
+      db:
+        condition: service_healthy
     volumes:
       - ./api/uploads:/app/uploads
 
@@ -38,9 +57,13 @@ services:
     ports:
       - "${PMA_PORT:-8085}:80"
     environment:
-      - PMA_HOST=${DB_HOST:-host.docker.internal}
-      - PMA_PORT=${DB_PORT:-3310}
+      - PMA_HOST=db
+      - PMA_PORT=3306
       - PMA_USER=${DB_USER:-root}
       - PMA_PASSWORD=${DB_PASSWORD:-Itsapcpka25}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  mysql_data:

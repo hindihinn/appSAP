@@ -1,0 +1,9 @@
+.git
+.gitignore
+.qodo
+node_modules
+dist
+build
+*.log
+*.exe
+mobile/
