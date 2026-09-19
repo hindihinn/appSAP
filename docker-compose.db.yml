@@ -13,10 +13,11 @@ services:
       - mysql_data:/var/lib/mysql
       - ./fleet_management.sql:/docker-entrypoint-initdb.d/fleet_management.sql:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD:-Itsapcpka25}"]
-      interval: 5s
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p${DB_PASSWORD:-Itsapcpka25} || exit 1"]
+      interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 30
+      start_period: 60s
 
   api:
     build: ./api
